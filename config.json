@@ -1,10 +1,19 @@
 {
 	"modules": {
 		"luascript": "./modules/luascript.lua",
+		"dom": "./modules/dom.lua",
 		"logger": "./modules/logger.lua",
 		"eventbus": "./modules/eventbus.lua",
-		"dom": "./modules/dom.lua",
+		"timer": "./modules/timer.lua",
+		"storage": "./modules/storage.lua",
+		"crypto": "./modules/crypto.lua",
+		"http": "./modules/http.lua",
+		"fetch": "./modules/fetch.lua",
+		"asset": "./modules/asset.lua",
+		"ws": "./modules/ws.lua",
+		"fs": "./modules/fs.lua",
 		"json": "./modules/json.lua",
-		"fetch": "./modules/fetch.lua"
-	}
+		"pdf": "./modules/pdf.lua",
+		"mathutil": "./modules/mathutil.lua"
+    }
 }

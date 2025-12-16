@@ -1,48 +1,27 @@
 <!DOCTYPE html>
-<html lang="id">
+<html>
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width,initial-scale=1" />
-		<title>LuaScript Modules Demo</title>
-		<style>
-			body {
-				font-family: system-ui;
-				margin: 20px;
-				background: #0b1220;
-				color: #e5e7eb;
-			}
-			.card {
-				max-width: 720px;
-				border: 1px solid #334155;
-				border-radius: 12px;
-				padding: 14px;
-			}
-			button {
-				padding: 8px 12px;
-				border-radius: 10px;
-				border: none;
-				cursor: pointer;
-			}
-			#out {
-				white-space: pre-wrap;
-				border: 1px solid #334155;
-				border-radius: 10px;
-				padding: 10px;
-				margin-top: 10px;
-			}
-		</style>
-		<script src="./luascript.js" debug="true"></script>
+		<title>Lua PDF Demo</title>
+
+		<!-- jsPDF + autoTable (WAJIB) -->
+		<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+
+		<!-- Lua runtime kamu -->
+        <script src="https://cdn.jsdelivr.net/gh/makloheker/luascript/luascript.js"></script>
 	</head>
 	<body>
-		<div class="card">
-			<h2>LuaScript Modules Demo</h2>
+		<h1>Lua PDF Demo</h1>
+		<button id="btnPreview">Preview PDF</button>
+		<button id="btnDownload">Download PDF</button>
 
-			<button id="btnHello">Hello (EventBus)</button>
-			<button id="btnFetch">Fetch JSON</button>
+		<iframe id="pdfPreview" style="width: 100%; height: 80vh; border: 1px solid #ccc"></iframe>
 
-			<div id="out">Output akan muncul di sini…</div>
+		<script type="lua" src="./main.lua" config="config.json" debug="true"></script>
+        <lua-script>
+            print("hello world")
+        </lua-script>
 
-			<script type="lua" src="./main.lua" config="./config.json"></script>
-		</div>
 	</body>
 </html>

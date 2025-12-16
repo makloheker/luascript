@@ -18,7 +18,6 @@
   `;
 	(document.head || document.documentElement).appendChild(style);
 
-	// Extra safety for already-parsed nodes
 	try {
 		document.querySelectorAll("lua-script, script[type='lua']").forEach((el) => {
 			el.hidden = true;
@@ -29,7 +28,6 @@
 (() => {
 	const FENGARI_URL = "https://unpkg.com/fengari-web/dist/fengari-web.js";
 
-	// Hide blocks ASAP (extra safety)
 	try {
 		document.querySelectorAll("lua-script, script[type='lua']").forEach((el) => {
 			el.hidden = true;
@@ -77,7 +75,6 @@
 			if (debugEnabled) currentWrite("[LuaDebug] " + msg);
 		}
 
-		// Safe stringify any Lua value at idx (uses luaL_tolstring)
 		function luaValueToString(idx) {
 			lauxlib.luaL_tolstring(L, idx);
 			const u8 = lua.lua_tostring(L, -1);
@@ -86,31 +83,27 @@
 			return s;
 		}
 
-		// ---- Error handler: debug.traceback ----
-		// We'll store debug.traceback in registry and use it as errfunc in every pcall.
 		function pushTracebackFunc() {
 			lua.lua_getglobal(L, to_luastring("debug"));
 			lua.lua_getfield(L, -1, to_luastring("traceback"));
-			lua.lua_remove(L, -2); // remove "debug" table, keep traceback on top
+			lua.lua_remove(L, -2);
 		}
 
-		// Save traceback function to registry
 		pushTracebackFunc();
 		const tracebackRef = lauxlib.luaL_ref(L, lua.LUA_REGISTRYINDEX);
 
 		function pcallWithTraceback(nargs, nresults) {
-			// stack: ... func arg1..argN
-			const base = lua.lua_gettop(L) - nargs; // index of function
-			lua.lua_rawgeti(L, lua.LUA_REGISTRYINDEX, tracebackRef); // push traceback
-			lua.lua_insert(L, base); // put traceback under function
+			const base = lua.lua_gettop(L) - nargs;
+			lua.lua_rawgeti(L, lua.LUA_REGISTRYINDEX, tracebackRef);
+			lua.lua_insert(L, base);
 			const status = lua.lua_pcall(L, nargs, nresults, base);
-			lua.lua_remove(L, base); // remove traceback
+			lua.lua_remove(L, base);
 			return status;
 		}
 
 		function reportLuaError(stage) {
 			if (!debugEnabled) {
-				lua.lua_pop(L, 1); // pop error
+				lua.lua_pop(L, 1);
 				return;
 			}
 			const msg = luaValueToString(-1);
@@ -118,7 +111,6 @@
 			currentWrite(`[LuaError] ${stage}: ${msg}`);
 		}
 
-		// print(...) -> output
 		lua.lua_pushcfunction(L, function (L) {
 			const n = lua.lua_gettop(L);
 			const out = [];
@@ -149,7 +141,6 @@
 			lua.lua_pushstring(L, to_luastring(String(val)));
 		}
 
-		// Call Lua global function by name (safe)
 		function callLuaByName(funcName, ...args) {
 			lua.lua_getglobal(L, to_luastring(funcName));
 			if (!lua.lua_isfunction(L, -1)) {
@@ -158,12 +149,10 @@
 				return;
 			}
 			for (const a of args) pushJsValue(a);
-
 			const st = pcallWithTraceback(args.length, 0);
 			if (st !== lua.LUA_OK) reportLuaError("callback");
 		}
 
-		// Call Lua function by registry ref (safe)
 		function callLuaByRef(ref, ...args) {
 			lua.lua_rawgeti(L, lua.LUA_REGISTRYINDEX, ref);
 			if (!lua.lua_isfunction(L, -1)) {
@@ -172,12 +161,10 @@
 				return;
 			}
 			for (const a of args) pushJsValue(a);
-
 			const st = pcallWithTraceback(args.length, 0);
 			if (st !== lua.LUA_OK) reportLuaError("callback");
 		}
 
-		// Module preload utility
 		function registerModule(name, sourceLua) {
 			lua.lua_getglobal(L, to_luastring("package"));
 			lua.lua_getfield(L, -1, to_luastring("preload"));
@@ -190,8 +177,6 @@
 					const src = srcU8 ? to_jsstring(srcU8) : "";
 
 					if (lauxlib.luaL_loadstring(L, to_luastring(src)) !== lua.LUA_OK) return lua.lua_error(L);
-
-					// Use normal pcall inside module loader; error will be handled by outer require/caller
 					if (lua.lua_pcall(L, 0, lua.LUA_MULTRET, 0) !== lua.LUA_OK) return lua.lua_error(L);
 
 					if (lua.lua_gettop(L) === 0) {
@@ -207,9 +192,6 @@
 			lua.lua_pop(L, 2);
 		}
 
-		// =========================================================
-		// CONFIG: resolve relative paths based on config URL
-		// =========================================================
 		function resolveUrl(path, baseUrl) {
 			try {
 				return new URL(path, baseUrl).href;
@@ -222,7 +204,6 @@
 		async function applyConfig(configUrl) {
 			if (!configUrl) return;
 
-			// Resolve configUrl relative to the page URL
 			const absConfigUrl = resolveUrl(configUrl, window.location.href);
 			if (loadedConfigs.has(absConfigUrl)) return;
 
@@ -231,7 +212,6 @@
 
 			if (cfg?.modules) {
 				for (const [name, path] of Object.entries(cfg.modules)) {
-					// Resolve module path relative to config.json URL
 					const absModuleUrl = resolveUrl(path, absConfigUrl);
 					const src = await fetchText(absModuleUrl);
 					registerModule(name, src);
@@ -243,10 +223,8 @@
 		}
 
 		// =========================================================
-		// luascript bridge (PyScript-like)
+		// luascript bridge
 		// =========================================================
-
-		// Delegated events store: key "event|selector" -> handlers[]
 		const eventHandlers = new Map();
 		const eventBound = new Set();
 
@@ -280,7 +258,6 @@
 			debug(`bound DOM event: ${eventName}`);
 		}
 
-		// Bridge table __LS_BRIDGE
 		lua.lua_newtable(L);
 		lua.lua_setglobal(L, to_luastring("__LS_BRIDGE"));
 
@@ -291,7 +268,28 @@
 			lua.lua_pop(L, 1);
 		}
 
-		// display(...)
+		// helpers for bridge args/callbacks
+		function argString(i) {
+			const u8 = lua.lua_tostring(L, i);
+			return u8 ? to_jsstring(u8) : "";
+		}
+		function getCallback(i) {
+			const t = lua.lua_type(L, i);
+			if (t === lua.LUA_TFUNCTION) {
+				lua.lua_pushvalue(L, i);
+				const ref = lauxlib.luaL_ref(L, lua.LUA_REGISTRYINDEX);
+				return { kind: "ref", value: ref };
+			}
+			// else treat as name string
+			const nameU8 = lua.lua_tostring(L, i);
+			return { kind: "name", value: nameU8 ? to_jsstring(nameU8) : "" };
+		}
+		function fireCallback(cb, ...args) {
+			if (!cb) return;
+			if (cb.kind === "name") callLuaByName(cb.value, ...args);
+			else callLuaByRef(cb.value, ...args);
+		}
+
 		setBridgeFunc("display", (L) => {
 			const n = lua.lua_gettop(L);
 			const parts = [];
@@ -305,22 +303,19 @@
 			return 0;
 		});
 
-		// DOM helpers (selector-based)
 		function qs(sel) {
 			return document.querySelector(sel);
 		}
 
 		setBridgeFunc("text", (L) => {
-			const selU8 = lua.lua_tostring(L, 1);
-			const sel = selU8 ? to_jsstring(selU8) : "";
+			const sel = argString(1);
 			const el = qs(sel);
 			if (!el) {
 				lua.lua_pushnil(L);
 				return 1;
 			}
 			if (lua.lua_gettop(L) >= 2) {
-				const vU8 = lua.lua_tostring(L, 2);
-				el.textContent = vU8 ? to_jsstring(vU8) : "";
+				el.textContent = argString(2);
 				return 0;
 			}
 			lua.lua_pushstring(L, to_luastring(el.textContent ?? ""));
@@ -328,16 +323,14 @@
 		});
 
 		setBridgeFunc("html", (L) => {
-			const selU8 = lua.lua_tostring(L, 1);
-			const sel = selU8 ? to_jsstring(selU8) : "";
+			const sel = argString(1);
 			const el = qs(sel);
 			if (!el) {
 				lua.lua_pushnil(L);
 				return 1;
 			}
 			if (lua.lua_gettop(L) >= 2) {
-				const vU8 = lua.lua_tostring(L, 2);
-				el.innerHTML = vU8 ? to_jsstring(vU8) : "";
+				el.innerHTML = argString(2);
 				return 0;
 			}
 			lua.lua_pushstring(L, to_luastring(el.innerHTML ?? ""));
@@ -345,18 +338,15 @@
 		});
 
 		setBridgeFunc("attr", (L) => {
-			const selU8 = lua.lua_tostring(L, 1);
-			const nameU8 = lua.lua_tostring(L, 2);
-			const sel = selU8 ? to_jsstring(selU8) : "";
-			const name = nameU8 ? to_jsstring(nameU8) : "";
+			const sel = argString(1);
+			const name = argString(2);
 			const el = qs(sel);
 			if (!el) {
 				lua.lua_pushnil(L);
 				return 1;
 			}
 			if (lua.lua_gettop(L) >= 3) {
-				const vU8 = lua.lua_tostring(L, 3);
-				el.setAttribute(name, vU8 ? to_jsstring(vU8) : "");
+				el.setAttribute(name, argString(3));
 				return 0;
 			}
 			lua.lua_pushstring(L, to_luastring(el.getAttribute(name) ?? ""));
@@ -364,46 +354,27 @@
 		});
 
 		setBridgeFunc("addClass", (L) => {
-			const selU8 = lua.lua_tostring(L, 1);
-			const clsU8 = lua.lua_tostring(L, 2);
-			const el = qs(selU8 ? to_jsstring(selU8) : "");
-			if (el) el.classList.add(clsU8 ? to_jsstring(clsU8) : "");
+			const el = qs(argString(1));
+			if (el) el.classList.add(argString(2));
 			return 0;
 		});
 
 		setBridgeFunc("removeClass", (L) => {
-			const selU8 = lua.lua_tostring(L, 1);
-			const clsU8 = lua.lua_tostring(L, 2);
-			const el = qs(selU8 ? to_jsstring(selU8) : "");
-			if (el) el.classList.remove(clsU8 ? to_jsstring(clsU8) : "");
+			const el = qs(argString(1));
+			if (el) el.classList.remove(argString(2));
 			return 0;
 		});
 
 		setBridgeFunc("toggleClass", (L) => {
-			const selU8 = lua.lua_tostring(L, 1);
-			const clsU8 = lua.lua_tostring(L, 2);
-			const el = qs(selU8 ? to_jsstring(selU8) : "");
-			if (el) el.classList.toggle(clsU8 ? to_jsstring(clsU8) : "");
+			const el = qs(argString(1));
+			if (el) el.classList.toggle(argString(2));
 			return 0;
 		});
 
-		// when(event, selector, handler)
 		setBridgeFunc("when", (L) => {
-			const evU8 = lua.lua_tostring(L, 1);
-			const selU8 = lua.lua_tostring(L, 2);
-			const ev = evU8 ? to_jsstring(evU8) : "";
-			const selector = selU8 ? to_jsstring(selU8) : "";
-
-			const t = lua.lua_type(L, 3);
-			let handler;
-			if (t === lua.LUA_TFUNCTION) {
-				lua.lua_pushvalue(L, 3);
-				const ref = lauxlib.luaL_ref(L, lua.LUA_REGISTRYINDEX);
-				handler = { kind: "ref", value: ref };
-			} else {
-				const nameU8 = lua.lua_tostring(L, 3);
-				handler = { kind: "name", value: nameU8 ? to_jsstring(nameU8) : "" };
-			}
+			const ev = argString(1);
+			const selector = argString(2);
+			const handler = getCallback(3);
 
 			const key = `${ev}|${selector}`;
 			if (!eventHandlers.has(key)) eventHandlers.set(key, []);
@@ -413,38 +384,425 @@
 			return 0;
 		});
 
-		// http.get(url, handler) async
 		setBridgeFunc("http_get", (L) => {
-			const urlU8 = lua.lua_tostring(L, 1);
-			const url = urlU8 ? to_jsstring(urlU8) : "";
-
-			const t = lua.lua_type(L, 2);
-			let handler;
-			if (t === lua.LUA_TFUNCTION) {
-				lua.lua_pushvalue(L, 2);
-				const ref = lauxlib.luaL_ref(L, lua.LUA_REGISTRYINDEX);
-				handler = { kind: "ref", value: ref };
-			} else {
-				const nameU8 = lua.lua_tostring(L, 2);
-				handler = { kind: "name", value: nameU8 ? to_jsstring(nameU8) : "" };
-			}
+			const url = argString(1);
+			const cb = getCallback(2);
 
 			fetch(url)
 				.then(async (r) => {
 					const text = await r.text();
-					if (handler.kind === "name") callLuaByName(handler.value, r.status, text);
-					else callLuaByRef(handler.value, r.status, text);
+					fireCallback(cb, r.status, text);
 				})
 				.catch((err) => {
-					if (handler.kind === "name") callLuaByName(handler.value, 0, String(err));
-					else callLuaByRef(handler.value, 0, String(err));
+					fireCallback(cb, 0, String(err));
 				});
 
 			return 0;
 		});
 
+		// --- timer bridges (set_timeout, set_interval, clear_timer) ---
+		const __timerMap = new Map();
+		let __timerNextId = 1;
+
+		setBridgeFunc("set_timeout", (L) => {
+			const ms = parseInt(argString(1) || "0", 10);
+			const cb = getCallback(2);
+			const id = __timerNextId++;
+
+			const handle = setTimeout(() => {
+				fireCallback(cb);
+				__timerMap.delete(id);
+			}, Math.max(0, ms));
+
+			__timerMap.set(id, { kind: "timeout", handle });
+			lua.lua_pushnumber(L, id);
+			return 1;
+		});
+
+		setBridgeFunc("set_interval", (L) => {
+			const ms = parseInt(argString(1) || "0", 10);
+			const cb = getCallback(2);
+			const id = __timerNextId++;
+
+			const handle = setInterval(() => {
+				fireCallback(cb);
+			}, Math.max(1, ms));
+
+			__timerMap.set(id, { kind: "interval", handle });
+			lua.lua_pushnumber(L, id);
+			return 1;
+		});
+
+		setBridgeFunc("clear_timer", (L) => {
+			const id = parseInt(argString(1) || "0", 10);
+			const it = __timerMap.get(id);
+			if (it) {
+				if (it.kind === "timeout") clearTimeout(it.handle);
+				else clearInterval(it.handle);
+				__timerMap.delete(id);
+			}
+			lua.lua_pushboolean(L, 1);
+			return 1;
+		});
+
+		// =========================================================
+		// ✅ ADDITIONAL BRIDGES (stable core)
+		// storage, crypto, ws, http_request, asset, call_api
+		// =========================================================
+
+		// --- storage (localStorage) ---
+		setBridgeFunc("storage_get", (L) => {
+			const key = argString(1);
+			let v = null;
+			try {
+				v = localStorage.getItem(key);
+			} catch {
+				v = null;
+			}
+			if (v === null || v === undefined) {
+				lua.lua_pushnil(L);
+			} else {
+				lua.lua_pushstring(L, to_luastring(String(v)));
+			}
+			return 1;
+		});
+
+		setBridgeFunc("storage_set", (L) => {
+			const key = argString(1);
+			const val = argString(2);
+			try {
+				localStorage.setItem(key, val);
+			} catch {}
+			lua.lua_pushboolean(L, 1);
+			return 1;
+		});
+
+		setBridgeFunc("storage_remove", (L) => {
+			const key = argString(1);
+			try {
+				localStorage.removeItem(key);
+			} catch {}
+			lua.lua_pushboolean(L, 1);
+			return 1;
+		});
+
+		setBridgeFunc("storage_clear", (L) => {
+			try {
+				localStorage.clear();
+			} catch {}
+			lua.lua_pushboolean(L, 1);
+			return 1;
+		});
+
+		setBridgeFunc("storage_keys", (L) => {
+			let keys = [];
+			try {
+				for (let i = 0; i < localStorage.length; i++) {
+					const k = localStorage.key(i);
+					if (k != null) keys.push(k);
+				}
+			} catch {}
+			lua.lua_pushstring(L, to_luastring(keys.join("\n")));
+			return 1;
+		});
+
+		// --- crypto (WebCrypto) ---
+		function bufToHex(buf) {
+			return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+		}
+
+		setBridgeFunc("crypto_random_bytes", (L) => {
+			const n = Math.max(1, Math.min(4096, parseInt(argString(1) || "16", 10)));
+			const arr = new Uint8Array(n);
+			crypto.getRandomValues(arr);
+			lua.lua_pushstring(L, to_luastring(bufToHex(arr)));
+			return 1;
+		});
+
+		setBridgeFunc("crypto_sha256", (L) => {
+			const text = argString(1);
+			const cb = getCallback(2);
+
+			crypto.subtle
+				.digest("SHA-256", new TextEncoder().encode(text))
+				.then((buf) => fireCallback(cb, "", bufToHex(buf)))
+				.catch((e) => fireCallback(cb, String(e), ""));
+
+			return 0;
+		});
+
+		setBridgeFunc("crypto_pbkdf2", (L) => {
+			const password = argString(1);
+			const salt = argString(2);
+			const iterations = parseInt(argString(3) || "100000", 10);
+			const bits = parseInt(argString(4) || "256", 10);
+			const cb = getCallback(5);
+
+			(async () => {
+				try {
+					const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+					const derived = await crypto.subtle.deriveBits(
+						{
+							name: "PBKDF2",
+							hash: "SHA-256",
+							salt: new TextEncoder().encode(salt),
+							iterations: iterations,
+						},
+						key,
+						bits
+					);
+					fireCallback(cb, "", bufToHex(derived));
+				} catch (e) {
+					fireCallback(cb, String(e), "");
+				}
+			})();
+
+			return 0;
+		});
+
+		// --- WebSocket ---
+		const __wsMap = new Map();
+		let __wsNextId = 1;
+
+		setBridgeFunc("ws_connect", (L) => {
+			const url = argString(1);
+			const onOpen = getCallback(2);
+			const onMessage = getCallback(3);
+			const onClose = getCallback(4);
+			const onError = getCallback(5);
+
+			const id = __wsNextId++;
+			let ws;
+			try {
+				ws = new WebSocket(url);
+			} catch (e) {
+				fireCallback(onError, "open_failed:" + String(e));
+				lua.lua_pushnumber(L, 0);
+				return 1;
+			}
+
+			ws.onopen = () => fireCallback(onOpen);
+			ws.onmessage = (ev) => fireCallback(onMessage, String(ev.data ?? ""));
+			ws.onclose = (ev) => fireCallback(onClose, ev.code ?? 0, String(ev.reason ?? ""));
+			ws.onerror = () => fireCallback(onError, "ws_error");
+
+			__wsMap.set(id, ws);
+			lua.lua_pushnumber(L, id);
+			return 1;
+		});
+
+		setBridgeFunc("ws_send", (L) => {
+			const id = parseInt(argString(1) || "0", 10);
+			const text = argString(2);
+			const ws = __wsMap.get(id);
+			try {
+				if (ws && ws.readyState === WebSocket.OPEN) ws.send(text);
+			} catch {}
+			lua.lua_pushboolean(L, 1);
+			return 1;
+		});
+
+		setBridgeFunc("ws_close", (L) => {
+			const id = parseInt(argString(1) || "0", 10);
+			const code = parseInt(argString(2) || "1000", 10);
+			const reason = argString(3);
+			const ws = __wsMap.get(id);
+			try {
+				if (ws) ws.close(code, reason);
+			} catch {}
+			__wsMap.delete(id);
+			lua.lua_pushboolean(L, 1);
+			return 1;
+		});
+
+		// --- http_request (method + headers + body + response headers) ---
+		setBridgeFunc("http_request", (L) => {
+			const method = argString(1).toUpperCase() || "GET";
+			const url = argString(2);
+			const headersJson = argString(3) || "{}";
+			const body = argString(4) || "";
+			const cb = getCallback(5);
+
+			let headers = {};
+			try {
+				headers = JSON.parse(headersJson || "{}") || {};
+			} catch {
+				headers = {};
+			}
+
+			fetch(url, {
+				method,
+				headers,
+				body: method === "GET" || method === "HEAD" ? undefined : body,
+			})
+				.then(async (r) => {
+					const text = await r.text();
+					const h = {};
+					try {
+						r.headers.forEach((v, k) => (h[k] = v));
+					} catch {}
+					fireCallback(cb, r.status, text, JSON.stringify(h));
+				})
+				.catch((err) => {
+					fireCallback(cb, 0, String(err), "{}");
+				});
+
+			return 0;
+		});
+
+		// --- asset loader (image/audio via blob URL) ---
+		setBridgeFunc("asset_image", (L) => {
+			const url = argString(1);
+			const cb = getCallback(2);
+
+			fetch(url)
+				.then((r) => r.blob())
+				.then((blob) => {
+					const objUrl = URL.createObjectURL(blob);
+					const img = new Image();
+					img.onload = () => fireCallback(cb, true, img.naturalWidth || 0, img.naturalHeight || 0, objUrl);
+					img.onerror = () => {
+						try {
+							URL.revokeObjectURL(objUrl);
+						} catch {}
+						fireCallback(cb, false, 0, 0, "");
+					};
+					img.src = objUrl;
+				})
+				.catch(() => fireCallback(cb, false, 0, 0, ""));
+
+			return 0;
+		});
+
+		setBridgeFunc("asset_audio", (L) => {
+			const url = argString(1);
+			const cb = getCallback(2);
+
+			fetch(url)
+				.then((r) => r.blob())
+				.then((blob) => {
+					const objUrl = URL.createObjectURL(blob);
+					// cukup kembalikan src; user bisa set ke <audio src=...>
+					fireCallback(cb, true, objUrl);
+				})
+				.catch(() => fireCallback(cb, false, ""));
+
+			return 0;
+		});
+
+		setBridgeFunc("asset_revoke", (L) => {
+			const objUrl = argString(1);
+			try {
+				URL.revokeObjectURL(objUrl);
+			} catch {}
+			return 0;
+		});
+
+		// --- generic extension hook ---
+		// User can define:
+		// window.LuaScriptAPI = { myFunc: (a,b)=>..., myAsync:(a, cb)=>... }
+		setBridgeFunc("call_api", (L) => {
+			const name = argString(1);
+			const n = lua.lua_gettop(L);
+
+			const api = window.LuaScriptAPI || {};
+			const fn = api[name];
+
+			if (typeof fn !== "function") {
+				// return nil
+				lua.lua_pushnil(L);
+				return 1;
+			}
+
+			// gather args 2..n
+			const args = [];
+			for (let i = 2; i <= n; i++) args.push(argString(i));
+
+			try {
+				const ret = fn(...args);
+				if (ret === undefined || ret === null) lua.lua_pushnil(L);
+				else lua.lua_pushstring(L, to_luastring(String(ret)));
+				return 1;
+			} catch (e) {
+				lua.lua_pushstring(L, to_luastring("ERR:" + String(e)));
+				return 1;
+			}
+		});
+
+		// ===================== PDF ENGINE =====================
+		let __pdfDoc = null;
+
+		setBridgeFunc("pdf_create", (L) => {
+			__pdfDoc = new jspdf.jsPDF({ unit: "mm", format: "a4" });
+			lua.lua_pushboolean(L, 1);
+			return 1;
+		});
+
+		setBridgeFunc("pdf_add_page", (L) => {
+			if (!__pdfDoc) return 0;
+			__pdfDoc.addPage();
+			return 0;
+		});
+
+		setBridgeFunc("pdf_text", (L) => {
+			if (!__pdfDoc) return 0;
+			const x = parseFloat(argString(1));
+			const y = parseFloat(argString(2));
+			const text = argString(3);
+			const size = parseFloat(argString(4) || "12");
+			__pdfDoc.setFontSize(size);
+			__pdfDoc.text(text, x, y);
+			return 0;
+		});
+
+		setBridgeFunc("pdf_table", (L) => {
+			if (!__pdfDoc) return 0;
+			const x = parseFloat(argString(1));
+			const y = parseFloat(argString(2));
+			const headers = JSON.parse(argString(3));
+			const rows = JSON.parse(argString(4));
+			__pdfDoc.autoTable({
+				startY: y,
+				head: [headers],
+				body: rows,
+				margin: { left: x },
+			});
+			return 0;
+		});
+
+		setBridgeFunc("pdf_save", (L) => {
+			if (!__pdfDoc) return 0;
+			const name = argString(1) || "output.pdf";
+			__pdfDoc.save(name);
+			__pdfDoc = null;
+			return 0;
+		});
+		setBridgeFunc("pdf_blob_url", (L) => {
+			if (!__pdfDoc) {
+				lua.lua_pushnil(L);
+				return 1;
+			}
+			try {
+				// jsPDF supports output('blob') or output('bloburl') depending version
+				const blob = __pdfDoc.output("blob");
+				const url = URL.createObjectURL(blob);
+				lua.lua_pushstring(L, to_luastring(url));
+				return 1;
+			} catch (e) {
+				lua.lua_pushnil(L);
+				return 1;
+			}
+		});
+
+		setBridgeFunc("pdf_revoke", (L) => {
+			const url = argString(1);
+			try {
+				URL.revokeObjectURL(url);
+			} catch {}
+			return 0;
+		});
+
 		// Built-in module "luascript" (optional convenience)
-		// NOTE: You can remove this block if you want "framework mode" strictly (modules only via config).
 		registerModule(
 			"luascript",
 			`
@@ -475,14 +833,12 @@
 			const st = pcallWithTraceback(0, lua.LUA_MULTRET);
 			if (st !== lua.LUA_OK) reportLuaError("runtime");
 
-			// clear any returned values (keep stack clean)
 			lua.lua_settop(L, 0);
 		}
 
 		const nodes = Array.from(document.querySelectorAll("lua-script, script[type='lua']"));
 
 		for (const el of nodes) {
-			// keep hidden always
 			el.hidden = true;
 
 			currentWrite = makeOutput(el);
@@ -501,7 +857,6 @@
 			else code = el.textContent || "";
 
 			runLua(code);
-
 			debug("LuaScript runtime finished one script node");
 		}
 
