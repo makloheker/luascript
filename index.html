@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="id">
+	<head>
+		<meta charset="utf-8" />
+		<title>Lua Web Game</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+		<!-- WAJIB: cegah lua-script tampil sebagai teks -->
+		<style>
+			lua-script,
+			script[type="lua"] {
+				display: none !important;
+			}
+			body {
+				font-family: system-ui, sans-serif;
+				background: #0b1220;
+				color: #e5e7eb;
+				padding: 20px;
+			}
+			#arena {
+				position: relative;
+				width: 100%;
+				max-width: 600px;
+				height: 360px;
+				border: 2px solid #334155;
+				border-radius: 12px;
+				margin-top: 12px;
+				overflow: hidden;
+			}
+			#target {
+				position: absolute;
+				width: 48px;
+				height: 48px;
+				border-radius: 999px;
+				background: #22c55e;
+				cursor: pointer;
+			}
+			button {
+				padding: 8px 14px;
+				border-radius: 8px;
+				border: none;
+				cursor: pointer;
+			}
+		</style>
+
+		<!-- Runtime Lua kamu -->
+		<script src="./lua.js" debug="true"></script>
+	</head>
+	<body>
+		<h2>🎯 Lua Web Game (Event Based)</h2>
+
+		<div>
+			Score: <b id="score">0</b>
+			<button id="resetBtn">Reset</button>
+		</div>
+
+		<div id="arena">
+			<div id="target"></div>
+		</div>
+
+		<!-- Lua game -->
+		<script type="lua" src="./game/main.lua" config="./config.json" debug="true"></script>
+	</body>
+</html>
