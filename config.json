@@ -1,5 +1,10 @@
 {
 	"modules": {
-		"luascript": "./modules/luascript.lua"
+		"luascript": "./modules/luascript.lua",
+		"logger": "./modules/logger.lua",
+		"eventbus": "./modules/eventbus.lua",
+		"dom": "./modules/dom.lua",
+		"json": "./modules/json.lua",
+		"fetch": "./modules/fetch.lua"
 	}
 }
