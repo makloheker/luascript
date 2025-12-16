@@ -1,1 +1,7 @@
 node_modules/
+lua.js
+lua.min.js
+config.json
+package-lock.json
+package.json
+main.lua
